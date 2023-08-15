@@ -1,3 +1,21 @@
+/*
+  Copyright 2023 KoreUniv-MNC
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+     
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+
+
 #include <core.p4>
 #include <v1model.p4>
 
@@ -16,9 +34,9 @@
 
 
 
-// #define HALF_NUM_PARAMETERS 400000
-#define PARAMETERS 114538 // 37148106 / 32 / 32
-#define S_THRESHOLD 1718 // 37148106*0.48/32= 557,221 (VGG-16)
+#define PARAMETERS 114538 
+#define SIGN_REGISTER_SIZE 112 
+#define S_THRESHOLD 1789 
 #define K_THRESHOLD 5
 
 control MyIngress(
@@ -27,9 +45,9 @@ control MyIngress(
     inout standard_metadata_t standard_metadata) {
 
 
-    register<bit<32>>(PARAMETERS) sign1;
-    register<bit<32>>(PARAMETERS) sign2;
-    register<bit<32>>(1024) idx_counter_register;
+    register<bit<32>>(SIGN_REGISTER_SIZE) sign_vector1;
+    register<bit<32>>(SIGN_REGISTER_SIZE) sign_vector2;
+    register<bit<32>>(SIGN_REGISTER_SIZE) idx_counter_register;
     register<bit<32>>(1) sum_grad_sign;
     register<bit<32>>(1) sum_grad_sign_backup;
     register<bit<32>>(1) k_counter;
@@ -561,24 +579,11 @@ control MyIngress(
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
     ARPandICMPResponder() arp_icmp_responder;
     Forwarder() forwarder;
 
     UDPReceiver() udp_receiver;
     WorkersCounter() workers_counter;
-    // ReconstructWorkerBitmap() reconstruct_worker_bitmap;
-    // UpdateAndCheckWorkerBitmap() update_and_check_worker_bitmap;
 
     NextStepSelector() next_step_selector;
 
@@ -615,8 +620,7 @@ control MyIngress(
     Processor() value30;
     Processor() value31;
 
-    apply { //FIXME:
-
+    apply {
 
         if (meta.switchml_md.packet_type == 4) {
             udp_receiver.apply(hdr, standard_metadata, meta);
@@ -626,20 +630,16 @@ control MyIngress(
             meta.switchml_md.packet_type == 6 ||
             meta.switchml_md.packet_type == 7) {
             reconstruct_worker_bitmap.apply();
-            // reconstruct_worker_bitmap.apply(meta);
         }
 
-        // If the packet is valid, should be either forwarded or processed
-        if (meta.drop_flag == 1w0) { //FIXME:
+        if (meta.drop_flag == 1w0) { 
             if (meta.switchml_md.packet_type == 4 ||
                 meta.switchml_md.packet_type == 5 ||
                 meta.switchml_md.packet_type == 6 ||
                 meta.switchml_md.packet_type == 7) {
-                // For CONSUME packets, record packet reception and check if this packet is a retransmission
                 update_and_check_worker_bitmap.apply();
                 k_register.read(meta.switchml_md.k, 0);
                 if(meta.switchml_md.k == 0 ){
-                    // meta.switchml_md.k = 1; //FIXME:
                     meta.switchml_md.k = 1;
                     k_register.write(0, 1);
                 }
@@ -647,7 +647,7 @@ control MyIngress(
             }
             // If it's a SwitchML packet, process it
             if ((packet_type_underlying_t) meta.switchml_md.packet_type >=
-                (packet_type_underlying_t) 4) { // all consume or harvest types
+                (packet_type_underlying_t) 4) {
 
                 // Aggregate values
                 value00.apply(hdr.d0.d00, hdr.d0.d00, meta.switchml_md);
@@ -694,39 +694,31 @@ control MyIngress(
         }
         
         if (hdr.switchml.round_end_flag == 1 && meta.switchml_md.packet_type == 1){
-            // Clear worker_bitmap
-            // worker_bitmap.write((bit<32>)meta.switchml_md.pool_index[14:1], 0);
-            
-            // bit<32> sign_reg_idx;
+
             bit<32> sign_vector1;
             bit<32> sign_vector2;
             bit<32> xor_result;
             bit<32> idx_counter;
             bit<32> sum;
-            bit<32> k_count;
+            bit<32> cnt;
             
             meta.sign_reg_idx = (bit<32>)hdr.switchml.tsi[31:5];
-            // meta.test1 = meta.sign_reg_idx;
             meta.sign_bitmap_index = hdr.switchml.tsi % 32;
             // meta.round_mod = hdr.switchml.round % 2;
             
 
             if (hdr.switchml.round % 2 == 0){
-                // sign2.read(sign_vector2, sign_reg_idx);
-                // sign_vector2 = sign_vector2 << 1;
-                // sign_vector2 = sign_vector2 + (bit<32>)hdr.d0.d00[31:31];
-                sign2.read(meta.sign_vector2, meta.sign_reg_idx);
+                sign_vector2.read(meta.sign_vector2, meta.sign_reg_idx);
                 save_sign_bit2.apply();
-                sign2.write(meta.sign_reg_idx, meta.sign_vector2);
+                sign_vector2.write(meta.sign_reg_idx, meta.sign_vector2);
                 idx_counter_register.read(idx_counter, meta.sign_reg_idx);
                 
-                // meta.test1 = meta.sign_vector2; // TEST
-                // meta.test1 = idx_counter; // TEST
+                meta.test1 = idx_counter; // TEST
                 
-                if(idx_counter == 31 || hdr.switchml.last_packet_flag==1){
-                    sign1.read(meta.sign_vector1, meta.sign_reg_idx);
+                if(idx_counter == 31){
+                    sign_vector1.read(meta.sign_vector1, meta.sign_reg_idx);
                     xor_result = meta.sign_vector2 ^ meta.sign_vector1;
-                    sign1.write(meta.sign_reg_idx, 0);
+                    sign_vector1.write(meta.sign_reg_idx, 0);
                     idx_counter_register.write(meta.sign_reg_idx, 0);
                     
                 }
@@ -735,34 +727,28 @@ control MyIngress(
                 }
             } 
             else{ // if(hdr.switchml.round % 2 == 1) {
-                // sign1.read(sign_vector1 , sign_reg_idx);
-                // sign_vector1 = sign_vector1 << 1;
-                // sign_vector1 = sign_vector1 + (bit<32>)hdr.d0.d00[31:31];
-                sign1.read(meta.sign_vector1, meta.sign_reg_idx);
+                sign_vector1.read(meta.sign_vector1, meta.sign_reg_idx);
                 save_sign_bit1.apply();
-                sign1.write(meta.sign_reg_idx, meta.sign_vector1);
+                sign_vector1.write(meta.sign_reg_idx, meta.sign_vector1);
                 idx_counter_register.read(idx_counter, meta.sign_reg_idx);
 
-                // meta.test1 = meta.sign_vector1; // TEST
-                // meta.test1 = idx_counter; // TEST
+                meta.test1 = idx_counter; // TEST
                 
-                if(idx_counter == 31 || hdr.switchml.last_packet_flag==1){
-                    sign2.read(meta.sign_vector2, meta.sign_reg_idx);
+                if(idx_counter == 31){
+                    sign_vector2.read(meta.sign_vector2, meta.sign_reg_idx);
                     xor_result = meta.sign_vector1 ^ meta.sign_vector2;
-                    sign2.write(meta.sign_reg_idx, 0);
+                    sign_vector2.write(meta.sign_reg_idx, 0);
                     idx_counter_register.write(meta.sign_reg_idx, 0);
                     
                 }
                 else{
                     idx_counter_register.write(meta.sign_reg_idx, idx_counter + 1);
                 }
-            }
-
-            meta.test1 = xor_result;   
+            }   
 
             sum_grad_sign.read(sum, 0);
 
-            if(idx_counter == 31 || hdr.switchml.last_packet_flag==1){
+            if(idx_counter == 31){
                 bit<32> temp1;
                 bit<32> temp2;
                 bit<32> popcount_result;
@@ -785,38 +771,36 @@ control MyIngress(
                 
                 sum = sum + popcount_result;
                 sum_grad_sign.write(0, sum);
-                sum_grad_sign_backup.write(0, sum); //FIXME:TEST
+                sum_grad_sign_backup.write(0, sum); 
             }
 
-            // if(hdr.switchml.last_packet_flag==1){
-            // if(meta.switchml_md.first_last_flag == 0 && hdr.switchml.last_packet_flag==1){
             if(hdr.switchml.last_packet_flag==1){
                 if(hdr.switchml.round % 2 == 1){
-                    sign2.write(meta.sign_reg_idx, 0);
+                    sign_vector2.write(meta.sign_reg_idx, 0);
                 }
                 else{
-                    sign1.write(meta.sign_reg_idx, 0);
+                    sign_vector1.write(meta.sign_reg_idx, 0);
                 }
-                sum_grad_sign_backup.write(0, sum); //FIXME:TEST
+                sum_grad_sign_backup.write(0, sum);
                 sum_grad_sign.write(0, 0);
                 idx_counter_register.write(meta.sign_reg_idx, 0);
 
-                k_counter.read(k_count, 0);
+                k_counter.read(cnt, 0);
                 if(sum >= S_THRESHOLD){
-                    k_count = k_count + 1;
-                    k_counter.write(0, k_count);
+                    cnt = cnt + 1;
+                    k_counter.write(0, cnt);
                 }
                 else{
-                    if (k_count == 0){
+                    if (cnt == 0){
                         // nothing
                     } 
                     else{
-                        k_count = k_count - 1;
+                        cnt = cnt - 1;
                     }
-                    k_counter.write(0, k_count);
+                    k_counter.write(0, cnt);
                 }       
 
-                if(k_count >= K_THRESHOLD){
+                if(cnt >= K_THRESHOLD){
                     k_register.read(meta.switchml_md.k, 0);
                     if(meta.switchml_md.k != 16){
                         meta.switchml_md.k = meta.switchml_md.k + 1;
@@ -826,7 +810,6 @@ control MyIngress(
                 }
             }
             meta.test2 = sum;
-            // sum_grad_sign.read(meta.test2, 0); //FIXME:
             k_register.read(meta.switchml_md.k, 0); //FIXME:
         }
         else{

@@ -1,5 +1,5 @@
 /*
-  Copyright 2021 Intel-KAUST-Microsoft
+  Copyright 2023 KoreUniv-MNC
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -19,25 +19,24 @@
 #include <core.p4>
 #include <v1model.p4>
 
-#include "configuration.p4"
-#include "types.p4"
-#include "headers.p4"
-#include "parsers.p4"
-#include "arp_icmp_responder.p4"
-#include "forwarder.p4"
-#include "udp_receiver.p4"
-#include "udp_sender.p4"
-#include "bitmap_checker.p4"
-#include "workers_counter.p4"
-#include "processor.p4"
-#include "next_step_selector.p4"
+#include "include/configuration.p4"
+#include "include/types.p4"
+#include "include/headers.p4"
+#include "include/parsers.p4"
+#include "include/arp_icmp_responder.p4"
+#include "include/forwarder.p4"
+#include "include/udp_receiver.p4"
+#include "include/udp_sender.p4"
+#include "include/bitmap_checker.p4"
+#include "include/workers_counter.p4"
+#include "include/processor.p4"
+#include "include/next_step_selector.p4"
 
 
 
-// #define HALF_NUM_PARAMETERS 400000
-#define PARAMETERS 37148106 // 37148106 / 32 / 32
-#define SIGN_REGISTER_SIZE 2097151 // 37148106 / 32 = 1,160,879
-#define S_THRESHOLD 580439 // 37148106*0.48/32= 557,221 (VGG-16)
+#define PARAMETERS 37148106
+#define SIGN_REGISTER_SIZE 36278 
+#define S_THRESHOLD 580439 //
 #define K_THRESHOLD 5
 
 control MyIngress(
