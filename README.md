@@ -24,7 +24,28 @@ The source code of SAINA was implemented on top of [SwitchML](https://github.com
 
 | Batch Size = 16 | Batch Size = 32 | Batch Size = 64 |
 |------------------|------------------|------------------|
-<!-- | ![SqueezeNet (batch size = 16)](graphs/squeezenet_batch16_tta.png) | ![SqueezeNet (batch size = 32)](graphs/squeezenet_batch32_tta.png) | ![SqueezeNet (batch size = 64)](graphs/squeezenet_batch64_tta.png) | -->
+| ![ResNet50 (batch size = 16)](graphs/resnet50_lr0.001_batch16_tta.png) | ![ResNet50 (batch size = 32)](graphs/resnet50_lr0.001_batch32_tta.png) | ![ResNet50 (batch size = 64)](graphs/resnet50_lr0.001_batch64_tta.png) |
+
+For ResNet50 model, when the batch size is set to 64, all schemes could not reach the target accuracy. Although we need to investigate better hyperparameters for improving the performance of all schemes, SAINA can reach the target accuracy faster than other schemes for other batch sizes. 
+
+### Effect of $s_{th}$
+| $s_{th}$ |    VGG-16     |  SqueezeNet   |
+|----------|---------------|---------------|
+|   30%    |     472.4s    |     771.2s    |
+|   40%    |     448.8s    |     543.1s    |
+|   50%    |     426.0s    |     401.0s    |
+|   60%    |     555.6s    |     508.4s    |
+|   70%    |     564.0s    |     530.3s    |
+
+### Effect of $c_{th}$
+| $c_{th}$ |    VGG-16     |  SqueezeNet   |
+|----------|---------------|---------------|
+|   1    |     451.0s    |     475.5s    |
+|   3    |     426.3s    |     464.1s    |
+|   5    |     426.0s    |     401.0s    |
+|   7    |     451.1s    |     417.3s    |
+|   9    |     463.0s    |     434.1s    |
+|   $k$* |     423.8s    |     396.5s    |
 
 
 ### Effect of SFCD Algorithm
@@ -36,10 +57,10 @@ The source code of SAINA was implemented on top of [SwitchML](https://github.com
 | SAINA ($k^*$)       | 78.0%                | 1.70x                |
 
 
-| Scheme              | SqueezeNet Final Accuracy | SqueezeNet TTA Reduction |
+| Scheme              | VGG-16 Final Accuracy | SqueezeNet TTA Reduction |
 |---------------------|--------------------------|--------------------------|
 | SAINA ($k$=1)       | 70.1%                    | 2.28x                    |
 | SAINA ($k$=8)       | 72.2%                    | 2.15x                    |
 | SAINA ($k^*$)       | 72.5%                    | 2.84x                    |
 
-In the above table, Final Accuracy means the accuracy when all training is completed, and TTA Reduction means how much TTA was reduced compared to when k=16 was set. 
+The above tables are results when the batch size is set to 32. In these tables, Final Accuracy means the accuracy when all training is completed, and TTA Reduction means how much TTA is reduced compared to when $k$ is fixed to 16.
